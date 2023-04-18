@@ -1,5 +1,5 @@
 from medium import Medium
-from node_newMac import Node
+from node_dualLink import Node
 from task_master import task_master
 from sch_task import sch_task
 import matplotlib.pyplot as plt
@@ -32,8 +32,8 @@ def pull_for_node_events(all_nodes , scheduler ):
 def tick_to_real(time_stamp):
     return time_stamp*simulation_scale
 
-ins_medium = Medium(12000 , "air(wireless)")
-ins_medium_downlink = Medium(12000 , "air(wireless)")
+ins_medium = Medium(12000 , "air(wireless)" , 1)
+ins_medium_downlink = Medium(12000 , "air(wireless)" , 0)
 node1 = Node(0)
 node1.isAP = True
 node2 = Node(1)
@@ -43,7 +43,7 @@ all_nodes.append(node2)
 all_nodes.append(node3)
 ins_taskmaster = task_master(20 , all_nodes)
 ins_medium.add_batch_subscriber(all_nodes)
-ins_medium.add_batch_subscriber(all_nodes)
+ins_medium_downlink.add_batch_subscriber(all_nodes)
 for i in range(0,1000,1):
     ins_taskmaster.add_task(sch_task(i , "send_beacon" , [0]))
 
@@ -57,6 +57,7 @@ while tick_counter < max_tick:
     transmitted_nodes = ins_medium.resolve_requests(tick_counter)
     transmitted_nodes_downlink = ins_medium_downlink.resolve_requests(tick_counter)
     ins_taskmaster.remove_filler(transmitted_nodes)
+    ins_taskmaster.remove_filler(transmitted_nodes_downlink)
     pull_for_node_events(all_nodes , ins_taskmaster)
     # can check for empty task master and impending messages for early termination 
     if ins_taskmaster.finished():

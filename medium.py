@@ -2,13 +2,14 @@ import random
 import math 
 class Medium:
 #need support for fading , shadowing , noise addition , and multiple channels 
-    def __init__(self , load_per_tick , m_type):
+    def __init__(self , load_per_tick , m_type , uid ):
         self.load_per_tick = load_per_tick
         self.m_type = m_type
         self.failure_probability = 1e-8
         self.channel_type = "no failure"
         self.subscribers = []
         self.collisions = []
+        self.uid = uid
         self.is_busy = False
 
     def add_batch_subscriber(self , susbcribers):
@@ -61,18 +62,18 @@ class Medium:
         self.is_busy = False
         nodes_transmitted = []
         for subscriber in self.subscribers:
-            if subscriber.is_ready_transmit():
+            if subscriber.is_ready_transmit(self.uid):
                 if not self.is_busy :
                     self.is_busy = True
-                    self.transmit_message_directly(subscriber.transmit_message(tick_counter) , subscriber , tick_counter)
+                    self.transmit_message_directly(subscriber.transmit_message(tick_counter , self.uid) , subscriber , tick_counter)
                     nodes_transmitted.append(subscriber.get_uid())
                 else:
-                    self.collisions.append([subscriber.get_uid(),subscriber.transmit_message(tick_counter)])
+                    self.collisions.append([subscriber.get_uid(),subscriber.transmit_message(tick_counter , self.uid)])
                     nodes_transmitted.append(subscriber.get_uid())
         return nodes_transmitted
     
     def pending_transmission(self):
         for susbscriber in self.subscribers:
-            if susbscriber.is_ready_transmit():
+            if susbscriber.is_ready_transmit(self.uid):
                 return True
         return False

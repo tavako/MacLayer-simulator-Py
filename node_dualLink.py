@@ -104,6 +104,7 @@ class Node:
                     self.transmit_history.append(msg)
                     msg_to_be_sent = msg
                     first_instance = False
+                    del(self.transmit_buffer[i])
                 else:
                     msg.set_wait_in_queue(current_time)
         return msg_to_be_sent.message

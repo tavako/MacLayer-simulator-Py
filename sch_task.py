@@ -15,7 +15,7 @@ class sch_task:
         if self.m_type == "delete_node":
             del all_nodes[self.args[0]]
         if self.m_type == "flush_queue":
-            all_nodes[self.args[0]].transmit_buffer.queue.clear()
+            all_nodes[self.args[0]].transmit_buffer = []
         if self.m_type == "show_recieved":
             all_nodes[self.args[0]].print_packets()
         if self.m_type == "send_beacon":
