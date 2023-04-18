@@ -34,14 +34,16 @@ class task_master:
         self.tasks = temp
         del temp
     
-    # it only removes one at a time so other tasks can continue
-    def remove_filler(self , target):
-        for i in range(len(self.tasks)):
-            task = self.tasks[i]
-            if task.m_type == "transmit_pending" and task.args[0] == target:
-                del(self.tasks[i])
-                self.task_counter -= 1
-                break
+    # it only removes one message of a node at a time so other tasks can continue
+    def remove_filler(self , targets):
+        for target in targets:
+            for i in range(len(self.tasks)):
+                task = self.tasks[i]
+                if task.m_type == "transmit_pending":
+                    if task.args[0] == target:
+                        del(self.tasks[i])
+                        self.task_counter -= 1
+                        break
 # read events from file , database 
     def laod_from_file(self,name):
         file1 = open(name, 'r')

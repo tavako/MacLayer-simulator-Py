@@ -33,6 +33,7 @@ def tick_to_real(time_stamp):
     return time_stamp*simulation_scale
 
 ins_medium = Medium(12000 , "air(wireless)")
+ins_medium_downlink = Medium(12000 , "air(wireless)")
 node1 = Node(0)
 node1.isAP = True
 node2 = Node(1)
@@ -41,10 +42,8 @@ all_nodes.append(node1)
 all_nodes.append(node2)
 all_nodes.append(node3)
 ins_taskmaster = task_master(20 , all_nodes)
-ins_medium.add_subscriber(node1)
-ins_medium.add_subscriber(node2)
-ins_medium.add_subscriber(node3)
-
+ins_medium.add_batch_subscriber(all_nodes)
+ins_medium.add_batch_subscriber(all_nodes)
 for i in range(0,1000,1):
     ins_taskmaster.add_task(sch_task(i , "send_beacon" , [0]))
 
@@ -55,8 +54,9 @@ ins_taskmaster.add_task(sch_task(240 , "queue_message" , [2  ,"oh , now I'm worr
 
 while tick_counter < max_tick:
     ins_taskmaster.exec_step(tick_counter)
-    successful_node = ins_medium.resolve_requests(tick_counter)
-    ins_taskmaster.remove_filler(successful_node)
+    transmitted_nodes = ins_medium.resolve_requests(tick_counter)
+    transmitted_nodes_downlink = ins_medium_downlink.resolve_requests(tick_counter)
+    ins_taskmaster.remove_filler(transmitted_nodes)
     pull_for_node_events(all_nodes , ins_taskmaster)
     # can check for empty task master and impending messages for early termination 
     if ins_taskmaster.finished():

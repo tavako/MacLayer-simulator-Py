@@ -7,10 +7,12 @@ class Medium:
         self.m_type = m_type
         self.failure_probability = 1e-8
         self.channel_type = "no failure"
-        self.load_buffer = [ ]
-        self.subscribers = [ ]
+        self.subscribers = []
+        self.collisions = []
         self.is_busy = False
 
+    def add_batch_subscriber(self , susbcribers):
+        self.subscribers = self.subscribers + susbcribers
     def add_subscriber(self, node):
         self.subscribers.append(node)
     
@@ -54,16 +56,20 @@ class Medium:
             state = "success"
             new_message = message 
         return state , new_message
+    
     def resolve_requests(self , tick_counter):
         self.is_busy = False
-        successful_node = 0
+        nodes_transmitted = []
         for subscriber in self.subscribers:
             if subscriber.is_ready_transmit():
-                self.is_busy = True
-                self.transmit_message_directly(subscriber.transmit_message(tick_counter) , subscriber , tick_counter)
-                successful_node = subscriber.get_uid()
-                break
-        return successful_node
+                if not self.is_busy :
+                    self.is_busy = True
+                    self.transmit_message_directly(subscriber.transmit_message(tick_counter) , subscriber , tick_counter)
+                    nodes_transmitted.append(subscriber.get_uid())
+                else:
+                    self.collisions.append([subscriber.get_uid(),subscriber.transmit_message(tick_counter)])
+                    nodes_transmitted.append(subscriber.get_uid())
+        return nodes_transmitted
     
     def pending_transmission(self):
         for susbscriber in self.subscribers:

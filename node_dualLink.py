@@ -8,11 +8,11 @@ class Node:
         self.status = "idle"
         self.uid = uid
         self.transmit_history = []
-        self.transmit_buffer = queue.Queue()
+        self.transmit_buffer = []
         self.max_retry_before_timeout = 3
         self.initial_backoff_period = 2 #unit slots 
         self.bits_per_slot = 40
-        self.mac_scheme = "tdma-fixed-singleLink"
+        self.mac_scheme = "tdma-fixed-DualLink"
         self.recieved_packets = []
         self.isAP = False
         self.initialization = True
@@ -40,7 +40,7 @@ class Node:
         self.recieved_packets.append(log_event(message , tick_counter))
         if message.startswith("control"):
             if message.startswith("control " + "initialize,beaconMac:"):
-                self.transmit_buffer.put(tracked_message("control request_join,beaconMac:" + message.split(":")[1] + "myMac:" + str(self.uid) ,tick_counter))
+                self.transmit_buffer.append(tracked_message("control request_join,beaconMac:" + message.split(":")[1] + "myMac:" + str(self.uid) ,tick_counter , 0 ))
                 self.permit_transmit(tick_counter , 35)
                 #remember the request and retries when model of channels is more complete
             if message.startswith("control request_join,beaconMac:") and self.isAP:
@@ -50,7 +50,7 @@ class Node:
                     self.occupied_timeslots += 1
                     self.timeslots[self.occupied_timeslots] = clientpanId
                 if self.uid == int(message[message.find(":")+1:message.find("myMac")]):
-                    self.transmit_buffer.put(tracked_message("control accept_join,beaconMac:" + str(self.uid) + "clientMac:" + str(clientMac) + "clientPanid:" + str(clientpanId) , tick_counter))
+                    self.transmit_buffer.append(tracked_message("control accept_join,beaconMac:" + str(self.uid) + "clientMac:" + str(clientMac) + "clientPanid:" + str(clientpanId) , tick_counter ,1 ))
                 self.maxPanId+=1
             if message.startswith("control accept_join,beaconMac:"):
                 clientMac_rec = message[message.find("clientMac:")+len("clientMac:") : message.find("clientPanid:")]
@@ -58,7 +58,7 @@ class Node:
                     self.panId = int(message[message.find("clientPanid:")+len("clientPanid:"):])
             if message.startswith("control "+"joinOpportunity,beaconMac:"):
                 if self.panId == -1:
-                    self.transmit_buffer.put(tracked_message("control request_join,beaconMac:" + message.split(":")[1] + "myMac:" + str(self.uid), tick_counter))
+                    self.transmit_buffer.append(tracked_message("control request_join,beaconMac:" + message.split(":")[1] + "myMac:" + str(self.uid), tick_counter , 0 ))
              #check tdma schedule and plan accordingly
             if message.startswith("control "+"tdma-sch:"):
                 self.timeslots = message.split(":")[1].split(",")
@@ -88,32 +88,44 @@ class Node:
 
     def queue_message(self , message , current_time):
         #to make whole system event based we need to make an event every time a message is queued or stays in queue after failing to win the contention window
-        self.transmit_buffer.put(tracked_message(message , current_time))
+        self.transmit_buffer.append(tracked_message(message , current_time , 0))
         
     def get_uid(self):
         return self.uid
     
-    def transmit_message(self , current_time):
-        message = self.transmit_buffer.get()
-        message.set_delay_to_deliver(current_time)
-        if not self.transmit_buffer.empty():
-            self.transmit_buffer.queue[0].set_wait_in_queue(current_time)
-        self.transmit_history.append(message)
-        return message.message 
+    def transmit_message(self , current_time , medium_asking):
+        first_instance = True
+        msg_to_be_sent = None
+        for i in range(len(self.transmit_buffer)):
+            msg = self.transmit_buffer[i]
+            if msg.target_medium == medium_asking :
+                if first_instance:
+                    msg.set_delay_to_deliver(current_time)
+                    self.transmit_history.append(msg)
+                    msg_to_be_sent = msg
+                    first_instance = False
+                else:
+                    msg.set_wait_in_queue(current_time)
+        return msg_to_be_sent.message
 
-    def is_ready_transmit(self):
-        return (not self.transmit_buffer.empty()) and (self.can_transmit or self.isAP)
+    def is_ready_transmit(self , medium_asking ):
+        if (not self.transmit_buffer == []) and (self.can_transmit or self.isAP):
+            for msg in self.transmit_buffer:
+                if msg.target_medium == medium_asking:
+                    return True
+        return False
+                
 
 #access point functions
     def send_beacon(self , current_time):
         if(current_time%self.beacon_order ==  0):
             if self.initialization:
-                self.transmit_buffer.put(tracked_message("control " + "initialize,beaconMac:" + str(self.uid) , current_time))
+                self.transmit_buffer.append(tracked_message("control " + "initialize,beaconMac:" + str(self.uid) , current_time , 1))
                 self.start_initialization_point = current_time
                 self.initialization  = False
                 #40 time slots for initialization need a new event on scheduler
             else:
-                self.transmit_buffer.put(tracked_message("control "+"joinOpportunity,beaconMac:" + str(self.uid) , current_time ))
+                self.transmit_buffer.append(tracked_message("control "+"joinOpportunity,beaconMac:" + str(self.uid) , current_time , 1 ))
                 self.start_rejoin = current_time
                 #10 time slots for rejoin
         elif  self.start_rejoin == current_time - 9 :
@@ -121,4 +133,4 @@ class Node:
             msg = "control " + "tdma-sch:" + str(self.timeslots[0])  
             for i in range(1,len(self.timeslots)):
                 msg = msg + "," + str(self.timeslots[i]) 
-            self.transmit_buffer.put(tracked_message(msg  , current_time))
+            self.transmit_buffer.append(tracked_message(msg  , current_time , 1))
