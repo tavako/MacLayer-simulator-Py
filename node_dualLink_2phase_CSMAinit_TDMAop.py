@@ -136,6 +136,7 @@ class Node:
                     del(self.transmit_buffer[i])
                 else:
                     msg.set_wait_in_queue(current_time)
+                    break
         return msg_to_be_sent.message
 
     def is_ready_transmit(self , medium_asking ):

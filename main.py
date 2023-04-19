@@ -1,5 +1,5 @@
 from medium import Medium
-from node_dualLink import Node
+from node_dualLink_classic import Node
 from task_master import task_master
 from sch_task import sch_task
 import matplotlib.pyplot as plt
@@ -18,7 +18,7 @@ avg_delay_in_node = 0
 tick_counter = 0
 all_nodes = []
 #-----simulation params
-# each tick equals how many micro seconds in real case
+# simulationscale -> each tick equals how many micro seconds in real case
 simulation_scale  = 1000
 max_tick = 1000
 sim_hopping_enabled = True
@@ -51,6 +51,7 @@ ins_taskmaster.add_task(sch_task(130 , "queue_message" , [1  ,"hello , I'm dead.
 ins_taskmaster.add_task(sch_task(140 , "queue_message" , [2  ,"I don't care." ]))
 ins_taskmaster.add_task(sch_task(268 , "queue_message" , [1  ,"you are dead , too" ]))
 ins_taskmaster.add_task(sch_task(240 , "queue_message" , [2  ,"oh , now I'm worried." ]))
+ins_taskmaster.add_task(sch_task(120 , "queue_message" , [0 , "you are dumb number 1" , 1 , 1]))
 
 while tick_counter < max_tick:
     ins_taskmaster.exec_step(tick_counter)

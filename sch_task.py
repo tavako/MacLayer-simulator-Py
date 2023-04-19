@@ -11,7 +11,10 @@ class sch_task:
         self.exec_time = new_exec_time
     def execute(self ,all_nodes , current_time ):
         if self.m_type == "queue_message":
-            all_nodes[self.args[0]].queue_message(self.args[1] , current_time)
+            if len(self.args)>2:
+                all_nodes[self.args[0]].queue_message(self.args[1] , current_time , self.args[2] , self.args[3]) 
+            else:
+                all_nodes[self.args[0]].queue_message(self.args[1] , current_time)
         if self.m_type == "delete_node":
             del all_nodes[self.args[0]]
         if self.m_type == "flush_queue":
