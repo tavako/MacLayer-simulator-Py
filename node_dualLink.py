@@ -1,16 +1,19 @@
 import queue
+import random
 from log_event import log_event
 from tracked_message import tracked_message
 from pair import pair
 from sch_task import sch_task 
 class Node:
+    base_ack_wait = 2
+    backoff_exponent = 2
+    max_retry_before_timeout = 3
     def __init__(self , uid ):
         self.status = "idle"
         self.uid = uid
         self.transmit_history = []
         self.transmit_buffer = []
-        self.max_retry_before_timeout = 3
-        self.initial_backoff_period = 2 #unit slots 
+        self.initial_backoff_period = random.randint(1,3) #unit slots 
         self.bits_per_slot = 40
         self.mac_scheme = "tdma-fixed-DualLink"
         self.recieved_packets = []
@@ -20,7 +23,10 @@ class Node:
         self.maxPanId = 1
         self.panMap = []
         self.panId = -1
-        self.backoffperiods = [2 ,5 ,7]
+        self.current_retry = 0
+        self.is_wait_ack = False
+        self.current_backoff = self.initial_backoff_period
+        self.wait_ack = Node.base_ack_wait
         self.timeslots = [None]*20    #18 5-length timeslots and 2 timeslots for rejoin 
         self.timeslots[0] = 0
         self.timeslots[1] = 0
@@ -28,6 +34,7 @@ class Node:
         self.start_rejoin = -10
         self.events = []
         self.can_transmit = False
+        self.current_initialize_request = ""
     
     def set_coordinate(self , x , y , range):
         #range can be calculated with emitted power later on
@@ -40,7 +47,12 @@ class Node:
         self.recieved_packets.append(log_event(message , tick_counter))
         if message.startswith("control"):
             if message.startswith("control " + "initialize,beaconMac:"):
-                self.transmit_buffer.append(tracked_message("control request_join,beaconMac:" + message.split(":")[1] + "myMac:" + str(self.uid) ,tick_counter , 0 ))
+                self.current_initialize_request = "control request_join,beaconMac:" + message.split(":")[1] + "myMac:" + str(self.uid) 
+                self.events.append(sch_task(tick_counter + self.current_backoff , "queue_message" , [self.uid , self.current_initialize_request]))
+                self.is_wait_ack = True
+                self.wait_ack = Node.base_ack_wait+self.current_backoff
+                self.current_backoff = self.current_backoff*Node.backoff_exponent
+                self.events.append(sch_task(tick_counter+self.wait_ack , "check_ack" , [self.uid , self.wait_ack ]))
                 self.permit_transmit(tick_counter , 35)
                 #remember the request and retries when model of channels is more complete
             if message.startswith("control request_join,beaconMac:") and self.isAP:
@@ -55,6 +67,8 @@ class Node:
             if message.startswith("control accept_join,beaconMac:"):
                 clientMac_rec = message[message.find("clientMac:")+len("clientMac:") : message.find("clientPanid:")]
                 if int(clientMac_rec) == self.uid :
+                    self.is_wait_ack = False
+                    self.current_backoff = self.initial_backoff_period
                     self.panId = int(message[message.find("clientPanid:")+len("clientPanid:"):])
             if message.startswith("control "+"joinOpportunity,beaconMac:"):
                 if self.panId == -1:
@@ -64,7 +78,22 @@ class Node:
                 self.timeslots = message.split(":")[1].split(",")
                 self.sch_for_transmit(tick_counter)
 
-
+    def check_ack_initialize(self , tick_counter):
+        if self.is_wait_ack :
+            if self.current_retry < Node.max_retry_before_timeout:
+                self.current_retry += 1
+                self.events.append(sch_task(tick_counter + self.current_backoff , "queue_message" , [self.uid ,self.current_initialize_request  ]))
+                self.is_wait_ack = True
+                self.wait_ack = self.base_ack_wait+self.current_backoff
+                self.current_backoff = self.current_backoff*Node.backoff_exponent
+                self.events.append(sch_task(tick_counter+self.wait_ack , "check_ack" , [self.uid , self.wait_ack ]))
+            else:
+                # request timeout
+                self.transmit_history.append(tracked_message(self.current_initialize_request , tick_counter - self.current_backoff/Node.backoff_exponent , 0))
+        else:
+            self.current_retry = 0 
+        return
+    
     def sch_for_transmit(self , tick_counter):
         for i in range(len(self.timeslots)):
             timeslot = self.timeslots[i]

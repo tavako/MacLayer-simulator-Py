@@ -27,5 +27,8 @@ class sch_task:
             all_nodes[self.args[0]].permit_transmit(current_time , 5)
         if self.m_type == "remove_transmit_permit":
             all_nodes[self.args[0]].remove_permit()
+        if self.m_type == "check_ack":
+            all_nodes[self.args[0]].check_ack_initialize(current_time)
+        
         
 # more events should be handled 
