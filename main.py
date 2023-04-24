@@ -41,9 +41,10 @@ node3 = Node(2)
 all_nodes.append(node1)
 all_nodes.append(node2)
 all_nodes.append(node3)
-ins_taskmaster = task_master(20 , all_nodes)
 ins_medium.add_batch_subscriber(all_nodes)
 ins_medium_downlink.add_batch_subscriber(all_nodes)
+
+ins_taskmaster = task_master(20 , all_nodes , [ins_medium , ins_medium_downlink])
 for i in range(0,1000,1):
     ins_taskmaster.add_task(sch_task(i , "send_beacon" , [0]))
 
@@ -60,6 +61,7 @@ while tick_counter < max_tick:
     ins_taskmaster.remove_filler(transmitted_nodes)
     ins_taskmaster.remove_filler(transmitted_nodes_downlink)
     pull_for_node_events(all_nodes , ins_taskmaster)
+    ins_taskmaster.carrier_sense(tick_counter)
     # can check for empty task master and impending messages for early termination 
     if ins_taskmaster.finished():
         print("EARLY-TERMINATION/terminated at step :", tick_counter )

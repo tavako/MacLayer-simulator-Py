@@ -1,9 +1,10 @@
 from sch_task import sch_task
 class task_master:
-    def __init__(self , approx_tasks ,all_nodes ):
+    def __init__(self , approx_tasks ,all_nodes  ,mediums ):
         self.tasks = [None] * approx_tasks 
         self.task_counter = 0
         self.all_nodes = all_nodes
+        self.mediums = mediums
 
     def add_task(self , task):
         if self.task_counter >= len(self.tasks):
@@ -44,6 +45,24 @@ class task_master:
                         del(self.tasks[i])
                         self.task_counter -= 1
                         break
+    def carrier_sense(self , current_time):
+        tmp = []
+        for i in range(self.task_counter) :
+            task = self.tasks[i]
+            if task.get_exec_time() == current_time:
+                if task.m_type == "check_medium_status":
+                    if self.mediums[task.args[1]].is_busy :
+                        self.all_nodes[task.args[0]].reset_cw(current_time ,task.args[1])
+                    else:
+                        cw = self.all_nodes[task.args[0]].current_cw
+                        cw += 1
+                        self.all_nodes[task.args[0]].set_current_cw(cw , current_time , task.args[1])
+                else:
+                    tmp.append(task)
+            else:
+                tmp.append(task)
+        self.tasks = tmp   
+        
 # read events from file , database 
     def laod_from_file(self,name):
         file1 = open(name, 'r')

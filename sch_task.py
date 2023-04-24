@@ -32,6 +32,10 @@ class sch_task:
             all_nodes[self.args[0]].remove_permit()
         if self.m_type == "check_ack":
             all_nodes[self.args[0]].check_ack_initialize(current_time)
+        if self.m_type == "LBS":
+            all_nodes[self.args[0]].continuous_LBS(current_time , self.args[1])
+        if self.m_type == "check_msg_ack":
+            all_nodes[self.args[0]].check_ack_msg(current_time)
         
         
 # more events should be handled 
