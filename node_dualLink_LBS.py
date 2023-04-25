@@ -17,7 +17,7 @@ class Node:
         self.transmit_buffer = []
         self.initial_backoff_period = random.randint(1,3) #unit slots 
         self.bits_per_slot = 40
-        self.mac_scheme = "tdma-fixed-DualLink"
+        self.mac_scheme = "duallink_LBS"
         self.recieved_packets = []
         self.isAP = False
         self.initialization = True
@@ -71,7 +71,15 @@ class Node:
                 if self.panId == -1:
                     self.regiser_BS(message , tick_counter )
         elif self.isAP:
-            self.transmit_buffer.append(tracked_message("ack" , tick_counter , 1))
+            target_pid = message.split(":")[0]
+            self.transmit_buffer.append(tracked_message("ack" + target_pid , tick_counter , 1))
+        elif message.startswith("ack"):
+            target_pid = message[message.find("ack")+len("ack"):]
+            if self.uid == int(target_pid):
+                self.is_wait_msg_ack = False
+                self.current_backoff =self.initial_backoff_period
+
+    
                     
     def regiser_BS(self , message , tick_counter):
         self.current_initialize_request = "control request_join,beaconMac:" + message.split(":")[1] + "myMac:" + str(self.uid) 
@@ -88,6 +96,8 @@ class Node:
     def set_current_cw(self , cw , current_time , target_medium):
         self.current_cw =  cw
         if cw == Node.base_contention_windows:
+            self.is_wait_msg_cw = False
+            self.current_cw = 0
             self.permit_transmit(current_time , 5 )
         else:
             self.events.append(sch_task(current_time+1 , "LBS" , [self.uid , target_medium]))
@@ -98,6 +108,8 @@ class Node:
             self.events.append(sch_task(current_time+1 , "LBS" , [self.uid , target_medium]))
             self.cw_resets += 1
         else:
+            self.is_wait_msg_cw = False
+            self.current_cw = 0
             self.transmit_history.append(tracked_message("timeout on acquire channel" , current_time , 0))
         
 
@@ -128,9 +140,14 @@ class Node:
                 self.events.append(sch_task(tick_counter+ self.wait_msg_ack , "check_msg_ack" , [self.uid , self.last_msg]))
             else:
                 self.transmit_history.append(tracked_message("timeout" + self.last_msg , tick_counter - self.current_backoff/Node.backoff_exponent , 0))
+                self.reset_msg_ack()
+                if self.transmit_buffer != []:
+                    self.continuos_LBS(tick_counter , 0 )
         else:
-            self.msg_ack_counter = 0
-
+            self.reset_msg_ack()
+    def reset_msg_ack(self):
+        self.msg_ack_counter = 0
+        self.is_wait_msg_ack = False 
     
     def permit_transmit(self ,current_time , duration):
         self.can_transmit = True
@@ -144,10 +161,10 @@ class Node:
         for packet in self.recieved_packets:
             packet.print_logs()
 
-    def queue_message(self , message , current_time):
+    def queue_message(self , message , current_time , medium = 0):
         #to make whole system event based we need to make an event every time a message is queued or stays in queue after failing to win the contention window
-        self.transmit_buffer.append(tracked_message(message , current_time , 0))
-        if not self.wait_msg_ack:
+        self.transmit_buffer.append(tracked_message(message , current_time , medium))
+        if not (self.is_wait_msg_cw or self.is_wait_msg_ack) and medium == 0: 
             self.continuos_LBS(current_time  , 0)
             self.is_wait_msg_cw = True
         
@@ -161,12 +178,17 @@ class Node:
             msg = self.transmit_buffer[i]
             if msg.target_medium == medium_asking :
                 if first_instance:
-                    self.wait_msg_ack = True
-                    self.msg_ack_counter = 0
                     msg.set_delay_to_deliver(current_time)
                     self.transmit_history.append(msg)
+                    if not msg.message.startswith("control"):
+                        msg.message = str(self.uid)+":"+msg.message
                     msg_to_be_sent = msg
+                    self.last_msg = msg
                     first_instance = False
+                    if not self.isAP:
+                        self.wait_msg_ack = True
+                        self.msg_ack_counter = 0
+                        self.events.append(sch_task(current_time+Node.base_ack_wait , "check_msg_ack" , [self.uid , self.last_msg]))
                     del(self.transmit_buffer[i])
                 else:
                     msg.set_wait_in_queue(current_time)

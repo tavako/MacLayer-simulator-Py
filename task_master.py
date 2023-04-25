@@ -51,6 +51,7 @@ class task_master:
             task = self.tasks[i]
             if task.get_exec_time() == current_time:
                 if task.m_type == "check_medium_status":
+                    self.task_counter -= 1
                     if self.mediums[task.args[1]].is_busy :
                         self.all_nodes[task.args[0]].reset_cw(current_time ,task.args[1])
                     else:

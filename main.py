@@ -1,5 +1,5 @@
 from medium import Medium
-from node_dualLink_classic import Node
+from node_dualLink_LBS import Node
 from task_master import task_master
 from sch_task import sch_task
 import matplotlib.pyplot as plt
